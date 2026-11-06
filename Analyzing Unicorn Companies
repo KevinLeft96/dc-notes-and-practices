@@ -1,0 +1,36 @@
+WITH top_performing_industries AS (
+	SELECT i.industry, SUM(f.valuation) AS industry_valuation
+	FROM industries AS i
+	LEFT JOIN funding AS f
+		ON i.company_id = f.company_id
+	LEFT JOIN dates AS d
+		ON i.company_id = d.company_id
+	WHERE EXTRACT(year FROM d.date_joined) IN (2019, 2020, 2021)
+	GROUP BY i.industry
+	ORDER BY industry_valuation DESC
+	LIMIT 3
+),
+
+unicorn_details AS (
+	SELECT 	
+			i.industry, 
+			COUNT(*) as num_of_unicorns,
+			EXTRACT(year FROM d.date_joined) AS year,
+			AVG(f.valuation) AS avg_val_in_bil
+	FROM industries AS i
+	LEFT JOIN funding AS f
+		ON i.company_id = f.company_id
+	LEFT JOIN dates AS d
+		ON i.company_id = d.company_id
+	WHERE EXTRACT(year FROM d.date_joined) IN (2019, 2020, 2021)
+		AND i.industry IN (	SELECT industry
+							FROM top_performing_industries
+					)
+	GROUP BY i.industry, year
+)
+
+SELECT 	industry,
+		year,
+		num_of_unicorns AS num_unicorns,
+		ROUND(avg_val_in_bil/1000000000, 2) AS average_valuation_billions
+FROM unicorn_details;
