@@ -1,0 +1,53 @@
+-- top_five_products_each_category
+WITH top_5_products AS (
+SELECT 	p.product_name,
+		p.category,
+		SUM(o.sales :: NUMERIC) AS sales_cleaned,
+		SUM(o.profit :: NUMERIC) AS profit_cleaned,
+		RANK() OVER(
+							PARTITION BY p.category
+							ORDER BY SUM(o.sales :: NUMERIC) DESC) AS ranked_in_category
+FROM 	orders AS o
+		INNER JOIN products AS p
+			ON o.product_id = p.product_id
+GROUP BY p.product_name, p.category
+
+)
+
+SELECT 	category,
+		product_name,
+		ROUND(sales_cleaned, 2) AS product_total_sales,
+		ROUND(profit_cleaned, 2) AS product_total_profit,
+		ranked_in_category AS product_rank
+FROM top_5_products
+WHERE ranked_in_category <= 5;
+
+-- impute_missing_values order_id
+-- IV-2013-8930
+-- RS-2011-1760
+-- CA-2011-154599
+-- AG-2014-9060
+-- RS-2011-3610
+-- I found the above to ensure I got everything
+
+WITH missing_quantity AS (
+	SELECT product_id, discount, market, region, sales, quantity
+	FROM orders
+	WHERE quantity IS NULL
+),
+
+unit_price AS (
+	SELECT o.product_id,
+	o.sales:: numeric /o.quantity:: numeric  AS unit_price
+	FROM orders AS o
+	RIGHT JOIN missing_quantity AS m
+		ON o.product_id = m.product_id
+		AND o.discount = m.discount
+	WHERE o.quantity IS NOT NULL
+)
+
+SELECT DISTINCT m.*,
+		ROUND(m.sales::numeric/up.unit_price::numeric,0) AS calculated_quantity
+FROM missing_quantity AS m
+INNER JOIN unit_price AS up
+	ON m.product_id = up.product_id;
